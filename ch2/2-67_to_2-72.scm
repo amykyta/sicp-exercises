@@ -1,0 +1,156 @@
+#lang planet neil/sicp
+
+(define (make-leaf symbol weight)
+  (list 'leaf symbol weight))
+(define (leaf? object)
+  (eq? (car object) 'leaf))
+(define (symbol-leaf x) (cadr x))
+(define (weight-leaf x) (caddr x))
+
+(define (make-code-tree left right)
+  (list left
+        right
+        (append (symbols left) (symbols right))
+        (+ (weight left) (weight right))))
+
+(define (left-branch tree) (car tree))
+
+(define (right-branch tree) (cadr tree))
+(define (symbols tree)
+  (if (leaf? tree)
+      (list (symbol-leaf tree))
+      (caddr tree)))
+(define (weight tree)
+  (if (leaf? tree)
+      (weight-leaf tree)
+      (cadddr tree)))
+
+
+(define (decode bits tree)
+  (define (decode-1 bits current-branch)
+    (if (null? bits)
+        '()
+        (let ((next-branch
+               (choose-branch (car bits) current-branch)))
+          (if (leaf? next-branch)
+              (cons (symbol-leaf next-branch)
+                    (decode-1 (cdr bits) tree))
+              (decode-1 (cdr bits) next-branch)))))
+  (decode-1 bits tree))
+(define (choose-branch bit branch)
+  (cond ((= bit 0) (left-branch branch))
+        ((= bit 1) (right-branch branch))
+        (else (error "bad bit -- CHOOSE-BRANCH" bit))))
+
+;2.67
+
+(define sample-tree
+  (make-code-tree (make-leaf 'A 4)
+                  (make-code-tree
+                   (make-leaf 'B 2)
+                   (make-code-tree (make-leaf 'D 1)
+                                   (make-leaf 'C 1)))))
+
+(define sample-message '(0 1 1 0 0 1 0 1 0 1 1 1 0))
+
+;2.68
+
+(define (in-branch? symbol symbol-list)
+  (cond ((null? symbol-list) #f)
+        ((eq? symbol (car symbol-list)) #t)
+        (else (in-branch? symbol (cdr symbol-list)))))
+      
+(define (encode-symbol symbol tree)
+  (if  (leaf? tree)
+       '()
+       (let ((bit (if (in-branch? symbol (symbols (right-branch tree))) 
+                      1
+                      (if (in-branch? symbol (symbols (left-branch tree)))
+                          0
+                          (error "bad symbol - not part of the tree" symbol)))))
+         (let ((remaining-tree (if (= bit 0) 
+                                   (left-branch tree)
+                                   (right-branch tree))))
+           
+           (cons bit (encode-symbol remaining-tree))))))
+
+; someone's nice solution
+; (define (encode-symbol symbol tree) 
+;   (if (not (element-of-set? symbol (symbols tree))) 
+;       (error "symbol cannot be encoded") 
+;       (if (leaf? tree) 
+;           '() 
+;           (let ((left-set (symbols (left-branch tree))) 
+;                 (right-set (symbols (right-branch tree)))) 
+;             (cond ((element-of-set? symbol left-set) 
+;                    (cons 0 (encode-symbol symbol (left-branch tree)))) 
+;                   ((element-of-set? symbol right-set) 
+;                    (cons 1 (encode-symbol symbol (right-branch tree)))))))))
+  
+(define (encode message tree)
+  (if (null? message)
+      '()
+      (append (encode-symbol (car message) tree)
+              (encode (cdr message) tree))))
+
+;==========================
+(define (adjoin-set x set)
+  (cond ((null? set) (list x))
+        ((< (weight x) (weight (car set))) (cons x set))
+        (else (cons (car set)
+                    (adjoin-set x (cdr set))))))
+
+(define (make-leaf-set pairs)
+  (if (null? pairs)
+      '()
+      (let ((pair (car pairs)))
+        (adjoin-set (make-leaf (car pair)    ; symbol
+                               (cadr pair))  ; frequency
+                    (make-leaf-set (cdr pairs))))))
+
+;2.69
+
+(define (insert-new-node new-node node-list)
+  (cond ((null? node-list) (list new-node))
+        ((< (weight new-node) (weight (car node-list)))
+         (cons new-node node-list))
+        ((> (weight new-node) (weight (car node-list)))
+         (cons (car node-list) (insert-new-node new-node (cdr node-list))))
+        (else (cons new-node node-list))))
+
+(define (successive-merge leaf-set-pairs)
+  (if (null? (cdr leaf-set-pairs))
+      leaf-set-pairs
+      (successive-merge (insert-new-node
+                         (make-code-tree (car leaf-set-pairs)
+                                         (cadr leaf-set-pairs))
+                         (cddr leaf-set-pairs)))))
+
+(define (generate-huffman-tree pairs)
+  (successive-merge (make-leaf-set pairs)))
+
+;2.7
+(define rock-dictionary '((NA 16) (YIP 9) (SHA 3) (A 2) (GET 2) (JOB 2) (BOOM 1) (WAH 1)))
+
+(define song '(GET A JOB SHA na na na na na na na na GET A JOB SHA na na na na na na na na WAH yip yip yip yip yip yip yip yip yip SHA BOOM))
+
+(length (encode song (car (generate-huffman-tree rock-dictionary))))
+(* 3 (length song))
+
+
+;2.71
+;                        *
+;               16            15 
+;                         8        7..
+;                                4     3
+;                                     2    1
+; most frequent = 1 bit to be 0
+; least frequent = n - 1
+
+;2.72
+
+; for most frequent it'll be O(1), each time it'll just check the left branch,
+; find the element there and encode 0, then recurse and hit the base case.
+
+; for least frequent it'll search n - 1 levels of the tree halving the number 
+; of nodes at each one, the rest of the operations in each recursion are 
