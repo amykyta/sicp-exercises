@@ -1,0 +1,124 @@
+#lang planet neil/sicp
+
+(define (square n)
+  (* n n))
+
+(define (smallest-divisor n)
+  (find-divisor n 2))
+
+(define (next n)
+  (if (= n 2) 3 (+ n 2)))
+
+(define (find-divisor n test-divisor)
+  (cond ((> (square test-divisor) n) n)
+        ((divides? test-divisor n) test-divisor)
+        (else (find-divisor n (next test-divisor)))))
+
+(define (divides? a b)
+  (= (remainder b a) 0))
+
+
+(define (expmod base exp m)
+  (cond ((= exp 0) 1)
+        ((even? exp)
+         (remainder (square (expmod base (/ exp 2) m))
+                    m))
+        (else
+         (remainder (* base (expmod base (- exp 1) m))
+                    m))))
+
+(define (fermat-test n)
+  (define (try-it a)
+    (= (expmod a n n) a))
+  (try-it (+ 1 (random (- n 1)))))
+
+(define (fast-prime? n times)
+  (cond ((= times 0) true)
+        ((fermat-test n) (fast-prime? n (- times 1)))
+        (else false)))
+
+(define (prime? n)
+  (= n (smallest-divisor n)))
+
+(define (timed-prime-test n)
+  (newline)
+  ;(display n)
+  (start-prime-test n (runtime) 3))
+
+(define (start-prime-test n start-time count)
+  (cond ((even? n) (start-prime-test (inc n) start-time count))
+        ((fast-prime? n 1000000)
+            ;(display n)
+            ;(newline)
+            ;(report-prime (- (runtime) start-time))
+            (if (= count 1) (report-time (- (runtime) start-time)) 
+                (start-prime-test (+ n 2) start-time (dec count))))
+        (else (start-prime-test (+ n 2) start-time count))))
+
+(define (report-prime elapsed-time)
+  (display " *** ")
+  (display elapsed-time)
+  (newline))
+
+(define (report-time elapsed-time)
+  (display "Total time: ")
+  (display elapsed-time)
+  (newline))
+
+(define (carmichael n)
+  (car-iter n 1))
+
+(define (car-iter n a)
+  (define (try-it)
+    (= (expmod a n n) a))
+  (cond ((<= n a) #t)
+        ((try-it) (car-iter n (inc a)))
+        (else #f)))
+
+
+(define (trivial? a n)
+  (or (= a 1) (= a (- n 1))))
+
+(define (square-check x m)
+           (if (and 
+              (not (trivial? x m)) 
+              (= (remainder (square x) m) 1))
+             0
+             (remainder (square x) m)))
+  
+
+(define (singal-expmod base exp m)
+  (cond ((= exp 0) 1)
+        ((even? exp)
+         (square-check (singal-expmod base (/ exp 2) m) m))
+        (else
+         (remainder (* base (singal-expmod base (- exp 1) m))
+                    m))))
+
+(define (miller-rabin n)
+  (miller-rabin-iter n 1))
+
+(define (miller-rabin-iter n a)
+  (define (try-it)
+    (= (singal-expmod a (dec n) n) a))
+  (cond ((<= n a) #t)
+        ((try-it) (miller-rabin-iter n (inc a)))
+        (else #f)))
+
+(carmichael 17)
+(carmichael 25)
+(carmichael 561)
+(carmichael 1105)
+(carmichael 1729)
+(carmichael 2465)
+(carmichael 2821)
+(carmichael 6601)
+(newline)
+(miller-rabin 17)
+(miller-rabin 25)
+(miller-rabin 561)
+(miller-rabin 1105)
+(miller-rabin 1729)
+(miller-rabin 2465)
+(miller-rabin 2821)
+(miller-rabin 6601)
