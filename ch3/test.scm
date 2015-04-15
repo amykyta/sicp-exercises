@@ -1,0 +1,5 @@
+(define (test message test-result)
+  (display (if test-result '✓ 'x))
+  (display " - ")
+  (display message)
+  (newline))
